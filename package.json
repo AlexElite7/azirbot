@@ -13,7 +13,11 @@
   },
   "keywords": [],
   "author": "",
+<<<<<<< HEAD
   "license": "ISC",
+=======
+  "license": "ISC"
+>>>>>>> df859d08eab062ed409689c8b28b9f62432d224f
   "scripts": {
     "start": "node index.js"
   }
