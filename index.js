@@ -43,7 +43,16 @@ function getMember(p) {
 
 //Funzione di avvio inserimento membro
 function requestDetails(member) {
-  channelBotG.send("Inserisci l'eventuale nome su Telegram e/o delle note personalizzate di <@" + member.id + ">\nSepara le due informazioni con un trattino.\nSe si vuole lasciare vuoti i campi, scrivere soltanto il trattino.");
+  var t = "";
+  if(member.user.username == "UtenteTelegram") {
+    t += "Inserisci il nome dell'utente Telegram ed eventuali note personalizzate.\n";
+  }
+  else
+  {
+    t += "Inserisci l'eventuale nome su Telegram e/o delle note personalizzate di <@" + member.id + ">\n";
+  }
+  t += "Separa le due informazioni con un trattino.\nSe si vuole lasciare vuoti i campi, scrivere soltanto il trattino.";
+  channelBotG.send(t);
   functionBotID = 1;
   nMember = member;
 }
@@ -106,6 +115,12 @@ client.on("message", message => {
         channelBotG.send("Note aggiornate.");
         saveMembers();
         break;
+      case 4:
+        var m = message.content;
+        db({telegram:m}).remove();
+        channelBotG.send("Utente Telegram eliminato.");
+        saveMembers();
+        break;
     }
     functionBotID = 0;
   }
@@ -154,7 +169,8 @@ client.on("message", message => {
           t += "+) Menzionare l'utente in un canale testuale pubblico per poi copiare il contenuto nel canale *#azir_bot*\n\n";
 
           t += "Se si vuole aggiungere un membro appartenente solo a Telegram, menzionare l'utente su Discord *UtenteTelegram*.\n";
-          t += "I membri presenti soltanto sul gruppo Telegram possono essere visualizzati soltanto col comando *!showTelegramOnly*.";
+          t += "I membri presenti soltanto sul gruppo Telegram possono essere visualizzati soltanto col comando *!showTelegramOnly*.\n";
+          t += "Per eliminare un membro Telegram, menzionare l'utente su Discord *UtenteTelegram* e specificare successivamente il nome.";
 
           message.channel.send(t);
           break;
@@ -170,10 +186,17 @@ client.on("message", message => {
           break;
         case "!delete":
           var m = getMember(par);
-          if(nMember != undefined) {
-            printDetails(m);
-            db({discordID:m.id}).remove();
-            saveMembers();
+          if(m != undefined) {
+            if(m.user.username == "UtenteTelegram") {
+                channelBotG.send("Invia un messaggio per specificare l'utente Telegram da eliminare.");
+                functionBotID = 4;
+            }
+            else
+            {
+                printDetails(m);
+                db({discordID:m.id}).remove();
+                saveMembers();
+            }
           }
           else
           {
