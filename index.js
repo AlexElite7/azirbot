@@ -73,19 +73,6 @@ client.on("ready", () => {
   loadMembers();
 });
 
-client.on("guildMemberUpdate", (oldMember, newMember) => {
-  //Aggiunta membro
-  if(!oldMember.roles.exists("name", "Membri") && newMember.roles.exists("name", "Membri")) {
-    requestDetails(newMember);
-  }
-  //Rimozione membro
-  else if(oldMember.roles.exists("name", "Membri") && !newMember.roles.exists("name", "Membri")) {
-    printDetails(newMember);
-    db({discordID:newMember.id}).remove();
-    saveMembers();
-  }
-});
-
 client.on("message", message => {
   //Richieste del bot
   if(functionBotID != 0 && message.channel.name == "azir_bot" && message.author.username != "Azir Bot") {
