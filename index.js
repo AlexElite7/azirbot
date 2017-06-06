@@ -11,7 +11,7 @@ const fs = require("fs");
 var functionBotID = 0;
 var nMember;
 //Informazioni generali
-var version = "0.2.2 (Beta)";
+var version = "0.2.3 (Beta)";
 
 //Salva il database in un file
 function saveMembers() {
@@ -27,7 +27,7 @@ function loadMembers() {
   var dbFile = JSON.parse(fs.readFileSync("./elenco.json", "utf8"));
   for (var key in dbFile) {
     if (dbFile.hasOwnProperty(key)) {
-      db.insert({discordID:dbFile[key].discordID,discord:dbFile[key].discord,telegram:dbFile[key].telegram,notes:dbFile[key].notes});
+      db.insert({discordID:dbFile[key].discordID,type:dbFile[key].type,discord:dbFile[key].discord,telegram:dbFile[key].telegram,notes:dbFile[key].notes});
     }
   }
 }
@@ -39,6 +39,28 @@ function getMember(p) {
     m = m.substring(1);
   }
   return guildG.members.get(m);
+}
+
+function getMemberType(m) {
+  if(m.roles.exists("name", "Ospiti")) {
+    return 0;
+  }
+  else if (m.roles.exists("name", "Membri"))
+  {
+    return 1;
+  }
+  else if (m.roles.exists("name", "Tecnico"))
+  {
+    return 3;
+  }
+  else if (m.roles.exists("name", "Admin"))
+  {
+    return 4;
+  }
+  else if (m.roles.exists("name", "Founder"))
+  {
+    return 5;
+  }
 }
 
 //Funzione di avvio inserimento membro
@@ -63,7 +85,6 @@ function printDetails(member) {
   var t = "Il membro <@" + member.id + "> è stato rimosso.\n"
   t += "**Telegram:** " + e.telegram + "\t\t**Note:** " + e.notes;
   channelBotG.send(t);
-  
 }
 
 client.on("ready", () => {
@@ -73,6 +94,12 @@ client.on("ready", () => {
   loadMembers();
 });
 
+client.on("guildMemberRemove", (member) => {
+    printDetails(member);
+    db({discordID:member.id}).remove();
+    saveMembers();
+});
+
 client.on("message", message => {
   //Richieste del bot
   if(functionBotID != 0 && message.channel.name == "azir_bot" && message.author.username != "Azir Bot") {
@@ -80,8 +107,9 @@ client.on("message", message => {
       //Inserimento dati per il membro aggiunto
       case 1:
         var args = message.content.split("-");
-        db.insert({discordID:nMember.id,discord:nMember.user.username,telegram:args[0],notes:args[1]});
-        channelBotG.send("Membro aggiunto.");
+        db.insert({discordID:nMember.id,type:getMemberType(nMember),discord:nMember.user.username,telegram:args[0],notes:args[1]});
+        db.sort("type desc");
+        channelBotG.send("Utente aggiunto.");
         saveMembers();
         break;
       case 2:
@@ -125,15 +153,12 @@ client.on("message", message => {
           t += "`Azir Bot - Versione " + version + "`\n\n";
 
           t += "Elenco dei comandi disponibili:\n";
-          t += "+) **!add @nomeutente**: aggiunge un membro all'elenco.\n";
-          t += "+) **!delete @nomeutente**: elimina un membro all'elenco.\n";
-          t += "+) **!setTelegram @nomeutente**: imposta il Telegram di un membro nell'elenco.\n";
-          t += "+) **!setNotes @nomeutente**: imposta le note di un membro nell'elenco.\n";
-          t += "+) **!addTelegramUser nome**: imposta le note di un membro nell'elenco.\n";
-          t += "+) **!deleteTelegramUser nome**: imposta le note di un membro nell'elenco.\n";
-          t += "+) **!show**: mostra l'elenco dei membri.\n";
-          t += "+) **!showTelegramOnly**: mostra soltanto i membri che sono iscritti al gruppo Telegram.\n";
-          t += "+) **!findByTelegram telegram**: mostra i membri che corrispondono al Telegram specificato.\n\n";
+          t += "+) **!add @nomeutente**: aggiunge un utente all'elenco.\n";
+          t += "+) **!delete @nomeutente**: elimina un utente all'elenco.\n";
+          t += "+) **!setTelegram @nomeutente**: imposta il Telegram di un utente nell'elenco.\n";
+          t += "+) **!setNotes @nomeutente**: imposta le note di un utente nell'elenco.\n";
+          t += "+) **!showDiscord**: mostra l'elenco degli utenti relativo al Discord.\n";
+          t += "+) **!showTelegram**: mostra l'elenco degli utenti relativo a Telegram.\n";
 
           t += "***NOTE:***\n";
           t += "+) Per il corretto funzionamento del Bot, rispettare gli spazi tra le parole e inserire i nomi in modo appropiato.";
@@ -212,54 +237,57 @@ client.on("message", message => {
             channelBotG.send("Nome utente erratto.");
           }
           break;
-        case "!show":
-          message.channel.send("Elenco membri.\n\n");
-          var j = 0;
-          var t = "**Pag. 0**\n"; var i = 0; 
+        case "!showDiscord":
+          message.channel.send("```Elenco Utenti (Discord)```\n");
+          message.channel.send("```Legenda:\n⭐ - Founder\n✦ - Admin\n✪ - Tecnico\n★ - Membro\n☆ - Ospite```\n");
+          var i = 0; var j = 0;
+          var t = "```Markdown\n#Pag. 0```\n"; 
           db().each(function(r) {
             if(r.discord != "UtenteTelegram") {
-              t += "**Discord:** <@" + r.discordID + ">\t\t**Telegram:** " + r.telegram + "\t\t**Note:** " + r.notes + "\n";
+              var symbol;
+              switch(r.type) {
+                case 0: symbol = "☆"; break;
+                case 1: symbol = "★"; break;
+                case 2: symbol = "✪"; break;
+                case 3: symbol = "✦"; break;
+                case 4: symbol = "⭐"; break;
+              }
+              symbol += "| ";
+              t += symbol + "**Discord:** <@" + r.discordID + ">\t\t**Telegram:** " + r.telegram + "\t\t**Note:** " + r.notes + "\n";
               i++;
               if(i == 10) {
                 message.channel.send(t);
                 j++;
-                t = "**Pag . " + j + "**\n"; i = 0;
+                t = "```Markdown\n#Pag . " + j + "```\n"; i = 0;
               }
             }
           });
-          message.channel.send(t + "\nFine elenco.");
+          message.channel.send(t + "\n```Fine elenco.```");
           break;
-        case "!showTelegramOnly":
-          message.channel.send("Elenco membri che possiedono Telegram.\n\n");
-          var j = 0;
-          var t = "**Pag. 0**\n"; var i = 0;
+        case "!showTelegram":
+          message.channel.send("```Elenco Utenti (Telegram)```\n\n");
+          var i = 0; var j = 0;
+          var t = "```Markdown\n#Pag. 0```\n"; 
           db().each(function(r) {
             if(r.telegram != "") {
-              t += "**Discord:** <@" + r.discordID + ">\t\t**Telegram:** " + r.telegram + "\t\t**Note:** " + r.notes + "\n";
+              var showDiscord;
+              if(r.discord == "UtenteTelegram") {
+                showDiscord = "<nessuno>";
+              }
+              else
+              {
+                showDiscord = "<@" + r.discordID + ">";
+              }
+              t += "**Telegram:** " + r.telegram + "\t\t**Discord:** " + showDiscord + "\t\t**Note:** " + r.notes + "\n"
               i++;
               if(i == 10) {
                 message.channel.send(t);
                 j++;
-                t = "**Pag . " + j + "**\n"; i = 0;
+                t = "```Markdown\n#Pag . " + j + "```\n"; i = 0;
               }
             }
           });
-          message.channel.send(t + "\nFine elenco.");
-          break;
-        case "!findByTelegram":
-          message.channel.send("Elenco membri con il seguente Telegram: ***" + par + "***\n\n");
-          var j = 0;
-          var t = "**Pag. 0**\n"; var i = 0;
-          db({telegram:par}).each(function(r) {
-            t += "**Discord:** <@" + r.discordID + ">\t\t**Telegram:** " + r.telegram + "\t\t**Note:** " + r.notes + "\n";
-            i++;
-            if(i == 10) {
-              message.channel.send(t);
-              j++;
-              t = "**Pag . " + j + "**\n"; i = 0;
-            }
-          });
-          message.channel.send(t + "\nFine elenco.");
+          message.channel.send(t + "\n```Fine elenco.```");
           break;
         //Comandi nascosti
         case "!loadMembers":
@@ -269,11 +297,33 @@ client.on("message", message => {
           saveMembers();
           break; 
         case "!upMembers":
-          var c = guildG.roles.find("name", "Membri").members;
+          var c;
+          c = guildG.roles.find("name", "Founder").members;
           c.forEach(function(par, key) {
             var m = guildG.members.get(key);
-            db.insert({discordID:m.id,discord:m.user.username,telegram:"",notes:""});
+            db.insert({discordID:m.id,type:4,discord:m.user.username,telegram:"",notes:""});
           });
+          c = guildG.roles.find("name", "Admin").members;
+          c.forEach(function(par, key) {
+            var m = guildG.members.get(key);
+            db.insert({discordID:m.id,type:3,discord:m.user.username,telegram:"",notes:""});
+          });
+          c = guildG.roles.find("name", "Tecnico").members;
+          c.forEach(function(par, key) {
+            var m = guildG.members.get(key);
+            db.insert({discordID:m.id,type:2,discord:m.user.username,telegram:"",notes:""});
+          });
+          c = guildG.roles.find("name", "Membri").members;
+          c.forEach(function(par, key) {
+            var m = guildG.members.get(key);
+            db.insert({discordID:m.id,type:1,discord:m.user.username,telegram:"",notes:""});
+          });
+          c = guildG.roles.find("name", "Ospiti").members;
+          c.forEach(function(par, key) {
+            var m = guildG.members.get(key);
+            db.insert({discordID:m.id,type:0,discord:m.user.username,telegram:"",notes:""});
+          });
+          db.sort("type desc");
           message.channel.send("Membri caricati.");
           break;
       }
