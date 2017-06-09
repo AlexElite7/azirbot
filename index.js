@@ -455,7 +455,20 @@ client.on("message", message => {
           var t = "";
           t += "`Azir Bot - Versione " + version + "`\n\n";
 
-          t += "Elenco dei comandi disponibili:\n";
+          t += "Elenco delle funzionalità disponibili:\n\n";
+
+          t += "**STATISTICHE RANKED**\n";
+          t += "Questo Bot è in grado di fornirvi, in maniera del tutto automatica, le informazioni relative\n";
+          t += "ai giocatori della partita classificata che state giocando, senza consultare siti come OP.GG!\n";
+          t += "Per attivare questa funzione sarà sufficiente scrivere, tramite messaggio privato al Bot, il seguente comando:\n";
+          t += "**!enableRankedStats il_vostro_nome_su_lol**\n";
+          t += "Vi comparirà un messaggio che le **Statistiche Ranked** sono state abilitate, e che comincerete\n";
+          t += "a ricevere informazioni ogni qual volta entrerete in una partita classificata.\n"
+          t += "Qualora voleste disattivare questa funzione, basta inviare, sempre tramite messaggio privato, il seguente comando:\n";
+          t += "**!disableRankedStats**\n\n";
+
+          t += "**COMANDI IN CHAT**\n";
+          t += "Scrivere uno di questi comandi nella chat testuale #hall:\n";
           t += "+) **!help**: mostra l'elenco dei comandi.\n";
           t += "+) **!pizza**: joke del Bot.\n";
           t += "+) **!insulta1 @nomeutente**: insulta utente con una frase preimpostata (n° 1).\n";
