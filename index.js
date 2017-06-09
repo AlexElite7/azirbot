@@ -5,13 +5,35 @@ var guildG = new Discord.Guild();
 var channelBotG = new Discord.Channel();
 //Database
 TAFFY = require("taffy");
-var db = TAFFY([]);
+var db = TAFFY([]);   //Utenti
+var ranked = TAFFY([]);;  //Utenti con Statistiche Ranked abilitate
+var gg = new (require("op.gg-api/client.js"));
 const fs = require("fs");
+var request = require("request");
 //Inserimento membro
 var functionBotID = 0;
 var nMember;
 //Informazioni generali
-var version = "0.2.3 (Beta)";
+var version = "0.3 (Beta)";
+
+//Salva gli utenti abilitati alle Statistiche Ranked in un file
+function saveRankedUsers() {
+  fs.writeFile("./ranked.json", ranked().stringify(), (err) => {
+    if (err) {
+      console.error(err);
+    } 
+  });
+}
+
+//Carica il database dal file
+function loadRankedUsers() {
+  var rankedFile = JSON.parse(fs.readFileSync("./ranked.json", "utf8"));
+  for (var key in rankedFile) {
+    if (rankedFile.hasOwnProperty(key)) {
+      ranked.insert({discord:rankedFile[key].discord,summonerID:rankedFile[key].summonerID,summonerName:rankedFile[key].summonerName});
+    }
+  }
+}
 
 //Salva il database in un file
 function saveMembers() {
@@ -79,25 +101,121 @@ function requestDetails(member) {
   nMember = member;
 }
 
-//Stampa i dati del membro eliminato
-function printDetails(member) {
+//Stampa i dati del membro qualora viene aggiunto/eliminatio
+function printDetails(member, actionID) {
   var e = db({discordID:member.id}).first();
-  var t = "Il membro <@" + member.id + "> è stato rimosso.\n"
-  t += "**Telegram:** " + e.telegram + "\t\t**Note:** " + e.notes;
+  var t = "";
+  if(actionID == 0) {
+    t += "Il membro <@" + member.id + "> è stato rimosso.\n"
+    t += "**Telegram:** " + e.telegram + "\t\t**Note:** " + e.notes;
+  }
+  else 
+  {
+    t += "Il membro <@" + member.id + "> è stato aggiunto.\n"
+  }
   channelBotG.send(t);
 }
 
+//Stampa le statistiche relative ad un giocatore
+function printSummonerRankedData(summoner, champion, channel) {
+  gg.Summary("euw", summoner, function(error, data1) {
+    gg.Champions("euw", summoner, 7, function(error, data2) {
+      var p = false;
+      var i = 0;
+      while(!p) {
+        if(data2[i].name == champion) {
+          channel.send(
+            "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
+            "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
+            "**Winratio:** " + data2[i].winRatio + "%\t\t" +
+            "**Giocate:** " + (data2[i].wins + data2[i].losses) + " (" + data2[i].wins + "W | " + data2[i].losses + "L)\t\t" +
+            "**KDA:** " + data2[i].ratio + "\n");  
+          p = true;
+        }
+        else
+        {
+          i++;
+        }
+      }
+      if(!p) {
+        channel.send(
+            "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
+            "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
+            "**Winratio:** 0%\t\t" +
+            "**Giocate:** 0\t\t" +
+            "**KDA:** 0.00\n"); 
+      }
+	  })
+  })
+}
+
+//Stampa l'elenco di giocatori in base al team
+function printTeamRankedData (summonerID, teamID, channel) {
+  channel.send("```Markdown\n#Team " + (teamID + 1) + "```\n");
+  request({url: "https://euw1.api.riotgames.com/lol/spectator/v3/active-games/by-summoner/" + summonerID + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
+    if (!error && response.statusCode === 200) {
+      for(var i = teamID * 5; i < (teamID * 5) + 5; i++) {
+        let summoner = body.participants[i].summonerName;
+        request({url: "https://euw1.api.riotgames.com/lol/static-data/v3/champions/" + body.participants[i].championId + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error2, response2, body2) {
+          if (!error && response.statusCode === 200) {
+            let champion = body2.name;
+            printSummonerRankedData(summoner, champion, channel);
+          }
+        })
+      }
+    }
+  })
+}
+
+//Avvio bot
 client.on("ready", () => {
   console.log("Bot avviato.");
   guildG = client.guilds.find("name", "Italian Drifters");
   channelBotG = guildG.channels.find("name", "azir_bot");
   loadMembers();
+  loadRankedUsers();
 });
 
+//Stampa i dati di un utente quando viene cacciato dal server
+client.on("presenceUpdate", (oldMember, newMember) => {
+    if(newMember.presence.game != null) {
+      if(newMember.presence.game.name == "League of Legends" && ranked({discord:newMember.user.username}).count() == 1)
+      {
+        var summonerID = ranked({discord:newMember.user.username}).first().summonerID;
+        request({url: "https://euw1.api.riotgames.com/lol/spectator/v3/active-games/by-summoner/" + summonerID + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
+          if (!error && response.statusCode === 200) {
+            if(body.gameQueueConfigId == 420 || body.gameQueueConfigId == 440) {
+              newMember.user.createDM();
+              var channel = newMember.user.dmChannel;
+              channel.send("Lo scriba di Azir sta elaborando le informazioni, attendi...");
+              printTeamRankedData(summonerID, 0, channel);
+              setTimeout(printTeamRankedData, 10000, summonerID, 1, channel);
+            }
+          }
+        })
+      }
+    }
+});
+
+//Rileva se un utente con Statistiche Ranked abilitate entra in gioco
 client.on("guildMemberRemove", (member) => {
-    printDetails(member);
+    printDetails(member, 0);
     db({discordID:member.id}).remove();
     saveMembers();
+});
+
+//Rileva se un utente con Statistiche Ranked abilitate entra in gioco
+client.on("guildMemberUpdate", (oldMember, newMember) => {
+    if(oldMember.highestRole.name == "@everyone" && (newMember.highestRole.name == "Ospiti" || newMember.highestRole.name == "Membri")) {
+      db.insert({discordID:newMember.id,type:getMemberType(newMember),discord:newMember.user.username,telegram:"",notes:""});
+      db.sort("type desc");
+      saveMembers();
+      printDetails(newMember, 1);
+    }
+    else if(oldMember.highestRole != newMember.highestRole) 
+    {
+      db({discordID:newMember.id}).update({type:getMemberType(newMember)});
+    }
 });
 
 client.on("message", message => {
@@ -181,7 +299,7 @@ client.on("message", message => {
           t += "+) Menzionare l'utente in un canale testuale pubblico per poi copiare il contenuto nel canale *#azir_bot*\n\n";
 
           t += "Se si vuole aggiungere un membro appartenente solo a Telegram, menzionare l'utente su Discord *UtenteTelegram*.\n";
-          t += "I membri presenti soltanto sul gruppo Telegram possono essere visualizzati soltanto col comando *!showTelegramOnly*.\n";
+          t += "I membri presenti soltanto sul gruppo Telegram possono essere visualizzati soltanto col comando *!showTelegram*.\n";
           t += "Per eliminare un membro Telegram, menzionare l'utente su Discord *UtenteTelegram* e specificare successivamente il nome.";
 
           message.channel.send(t);
@@ -258,7 +376,7 @@ client.on("message", message => {
               if(i == 10) {
                 message.channel.send(t);
                 j++;
-                t = "```Markdown\n#Pag . " + j + "```\n"; i = 0;
+                t = "```Markdown\n#Pag. " + j + "```\n"; i = 0;
               }
             }
           });
@@ -283,20 +401,22 @@ client.on("message", message => {
               if(i == 10) {
                 message.channel.send(t);
                 j++;
-                t = "```Markdown\n#Pag . " + j + "```\n"; i = 0;
+                t = "```Markdown\n#Pag. " + j + "```\n"; i = 0;
               }
             }
           });
           message.channel.send(t + "\n```Fine elenco.```");
           break;
         //Comandi nascosti
-        case "!loadMembers":
+        case "!loadUsers":
           loadMembers();
+          message.channel.send("Utenti caricati.");
           break; 
-        case "!saveMembers":
+        case "!saveUsers":
           saveMembers();
+          message.channel.send("Utenti salvati.");
           break; 
-        case "!upMembers":
+        case "!upUsers":
           var c;
           c = guildG.roles.find("name", "Founder").members;
           c.forEach(function(par, key) {
@@ -324,7 +444,7 @@ client.on("message", message => {
             db.insert({discordID:m.id,type:0,discord:m.user.username,telegram:"",notes:""});
           });
           db.sort("type desc");
-          message.channel.send("Membri caricati.");
+          message.channel.send("Utenti caricati.");
           break;
       }
     }
@@ -358,6 +478,25 @@ client.on("message", message => {
           break;
         case "!insulta3":
           message.channel.send(par + ", sei più inutile di Antonio.", {tts: true});
+          break;
+        case "!enableRankedStats":
+          if(message.channel.type == "dm") {
+            request({url: "https://euw1.api.riotgames.com/lol/summoner/v3/summoners/by-name/" + par + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
+              if (!error && response.statusCode === 200) {
+                ranked.insert({discord:message.author.username,summonerID:body.id,summonerName:par});
+                saveRankedUsers();
+                message.channel.send("Le **Statistiche Ranked** sono state abilitate.\nD'ora in avanti riceverai, tramite messaggio privato, le statistiche dei giocatori ogni qual volta cominci una classificata.\nRicordati di tenere Discord aperto!\n\nPuoi disabilitare la funzione in qualunque momento inviando tramite messaggio privato il comando *!disableRankedStats*");
+              }
+              else
+              {
+                message.channel.send("Inserisci un nome evocatore valido.");
+              }
+            })
+          }
+          break;
+        case "!disableRankedStats": 
+          ranked({discord:message.author.username}).remove();
+          message.channel.send("Le **Statistiche Ranked** sono state disabilitate.\nPer poterle riattivare, scrivi tramite messaggio privato il comando *!enableRankedStats* seguito da uno spazio e dal tuo nome evocatore in League of Legends.");
           break;
       }
     }  
