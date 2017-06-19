@@ -18,7 +18,7 @@ var version = "0.3 (Beta)";
 
 //Salva gli utenti abilitati alle Statistiche Ranked in un file
 function saveRankedUsers() {
-  fs.writeFile("./ranked.json", ranked().stringify(), (err) => {
+  fs.writeFile("./data/ranked.json", ranked().stringify(), (err) => {
     if (err) {
       console.error(err);
     } 
@@ -27,7 +27,7 @@ function saveRankedUsers() {
 
 //Carica il database dal file
 function loadRankedUsers() {
-  var rankedFile = JSON.parse(fs.readFileSync("./ranked.json", "utf8"));
+  var rankedFile = JSON.parse(fs.readFileSync("./data/ranked.json", "utf8"));
   for (var key in rankedFile) {
     if (rankedFile.hasOwnProperty(key)) {
       ranked.insert({discord:rankedFile[key].discord,summonerID:rankedFile[key].summonerID,summonerName:rankedFile[key].summonerName});
@@ -37,7 +37,7 @@ function loadRankedUsers() {
 
 //Salva il database in un file
 function saveMembers() {
-  fs.writeFile("./elenco.json", db().stringify(), (err) => {
+  fs.writeFile("./data/elenco.json", db().stringify(), (err) => {
     if (err) {
       console.error(err);
     } 
@@ -46,7 +46,7 @@ function saveMembers() {
 
 //Carica il database dal file
 function loadMembers() {
-  var dbFile = JSON.parse(fs.readFileSync("./elenco.json", "utf8"));
+  var dbFile = JSON.parse(fs.readFileSync("./data/elenco.json", "utf8"));
   for (var key in dbFile) {
     if (dbFile.hasOwnProperty(key)) {
       db.insert({discordID:dbFile[key].discordID,type:dbFile[key].type,discord:dbFile[key].discord,telegram:dbFile[key].telegram,notes:dbFile[key].notes});
