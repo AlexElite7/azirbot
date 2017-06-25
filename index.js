@@ -3,6 +3,7 @@ const Discord = require("discord.js");
 const client = new Discord.Client();
 var guildG = new Discord.Guild();
 var channelBotG = new Discord.Channel();
+var channelUsersG = new Discord.Channel();
 //Database
 TAFFY = require("taffy");
 var db = TAFFY([]);   //Utenti
@@ -15,6 +16,7 @@ var functionBotID = 0;
 var nMember;
 //Informazioni generali
 var version = "0.3 (Beta)";
+var botEnabledForUsers = true;
 
 //Salva gli utenti abilitati alle Statistiche Ranked in un file
 function saveRankedUsers() {
@@ -172,6 +174,7 @@ client.on("ready", () => {
   console.log("Bot avviato.");
   guildG = client.guilds.find("name", "Italian Drifters");
   channelBotG = guildG.channels.find("name", "azir_bot");
+  channelUsersG = guildG.channels.find("name", "hall");
   loadMembers();
   loadRankedUsers();
 });
@@ -407,6 +410,19 @@ client.on("message", message => {
           });
           message.channel.send(t + "\n```Fine elenco.```");
           break;
+        case "!enableForUsers":
+          if(botEnabledForUsers) {
+            botEnabledForUsers = false;
+            channelBotG.send("Comandi del bot disabilitati per gli utenti.");
+            channelUsersG.send("I comandi del bot sono stati disabilitati.");
+          }
+          else
+          {
+            botEnabledForUsers = true;
+            channelBotG.send("Comandi del bot abilitati per gli utenti.");
+            channelUsersG.send("I comandi del bot sono stati abilitati.\nEvitate lo spam, grazie.");
+          }
+          break;
         //Comandi nascosti
         case "!loadUsers":
           loadMembers();
@@ -450,67 +466,69 @@ client.on("message", message => {
     }
     //Comandi utenti
     else {
-      switch(cmd) {
-        case "!help":
-          var t = "";
-          t += "`Azir Bot - Versione " + version + "`\n\n";
+      if(botEnabledForUsers) {
+        switch(cmd) {
+          case "!help":
+            var t = "";
+            t += "`Azir Bot - Versione " + version + "`\n\n";
 
-          t += "Elenco delle funzionalità disponibili:\n\n";
+            t += "Elenco delle funzionalità disponibili:\n\n";
 
-          t += "**STATISTICHE RANKED**\n";
-          t += "Questo Bot è in grado di fornirvi, in maniera del tutto automatica, le informazioni relative\n";
-          t += "ai giocatori della partita classificata che state giocando, senza consultare siti come OP.GG!\n";
-          t += "Per attivare questa funzione sarà sufficiente scrivere, tramite messaggio privato al Bot, il seguente comando:\n";
-          t += "**!enableRankedStats il_vostro_nome_su_lol**\n";
-          t += "Vi comparirà un messaggio che le **Statistiche Ranked** sono state abilitate, e che comincerete\n";
-          t += "a ricevere informazioni ogni qual volta entrerete in una partita classificata.\n"
-          t += "Qualora voleste disattivare questa funzione, basta inviare, sempre tramite messaggio privato, il seguente comando:\n";
-          t += "**!disableRankedStats**\n\n";
+            t += "**STATISTICHE RANKED**\n";
+            t += "Questo Bot è in grado di fornirvi, in maniera del tutto automatica, le informazioni relative\n";
+            t += "ai giocatori della partita classificata che state giocando, senza consultare siti come OP.GG!\n";
+            t += "Per attivare questa funzione sarà sufficiente scrivere, tramite messaggio privato al Bot, il seguente comando:\n";
+            t += "**!enableRankedStats il_vostro_nome_su_lol**\n";
+            t += "Vi comparirà un messaggio che le **Statistiche Ranked** sono state abilitate, e che comincerete\n";
+            t += "a ricevere informazioni ogni qual volta entrerete in una partita classificata.\n"
+            t += "Qualora voleste disattivare questa funzione, basta inviare, sempre tramite messaggio privato, il seguente comando:\n";
+            t += "**!disableRankedStats**\n\n";
 
-          t += "**COMANDI IN CHAT**\n";
-          t += "Scrivere uno di questi comandi nella chat testuale #hall:\n";
-          t += "+) **!help**: mostra l'elenco dei comandi.\n";
-          t += "+) **!pizza**: joke del Bot.\n";
-          t += "+) **!insulta1 @nomeutente**: insulta utente con una frase preimpostata (n° 1).\n";
-          t += "+) **!insulta2 @nomeutente**: insulta utente con una frase preimpostata (n° 2).\n";
-          t += "+) **!insulta3 @nomeutente**: insulta utente con una frase preimpostata (n° 3).\n\n";
+            t += "**COMANDI IN CHAT**\n";
+            t += "Scrivere uno di questi comandi nella chat testuale #hall:\n";
+            t += "+) **!help**: mostra l'elenco dei comandi.\n";
+            t += "+) **!pizza**: joke del Bot.\n";
+            t += "+) **!insulta1 @nomeutente**: insulta utente con una frase preimpostata (n° 1).\n";
+            t += "+) **!insulta2 @nomeutente**: insulta utente con una frase preimpostata (n° 2).\n";
+            t += "+) **!insulta3 @nomeutente**: insulta utente con una frase preimpostata (n° 3).\n\n";
 
-          t += "***NOTE:***\n";
-          t += "+) E' vietato lo spam di tali comandi, pena il disabilitamento del Bot.\n";
-          t += "+) Per il corretto funzionamento del Bot, rispettare gli spazi tra le parole e inserire i nomi in modo appropiato.";
-          message.channel.send(t);
-          break;
-        case "!pizza":
-          message.channel.send("Sono un imperatore io, non un porta pizze!", {tts: true});
-          break;
-        case "!insulta1":
-          message.channel.send(par + ", sei un pirla.", {tts: true});
-          break;
-        case "!insulta2":
-          message.channel.send(par + ", tua madre è una bagascia.", {tts: true});
-          break;
-        case "!insulta3":
-          message.channel.send(par + ", sei più inutile di Antonio.", {tts: true});
-          break;
-        case "!enableRankedStats":
-          if(message.channel.type == "dm") {
-            request({url: "https://euw1.api.riotgames.com/lol/summoner/v3/summoners/by-name/" + par + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
-              if (!error && response.statusCode === 200) {
-                ranked.insert({discord:message.author.username,summonerID:body.id,summonerName:par});
-                saveRankedUsers();
-                message.channel.send("Le **Statistiche Ranked** sono state abilitate.\nD'ora in avanti riceverai, tramite messaggio privato, le statistiche dei giocatori ogni qual volta cominci una classificata.\nRicordati di tenere Discord aperto!\n\nPuoi disabilitare la funzione in qualunque momento inviando tramite messaggio privato il comando *!disableRankedStats*");
-              }
-              else
-              {
-                message.channel.send("Inserisci un nome evocatore valido.");
-              }
-            })
-          }
-          break;
-        case "!disableRankedStats": 
-          ranked({discord:message.author.username}).remove();
-          message.channel.send("Le **Statistiche Ranked** sono state disabilitate.\nPer poterle riattivare, scrivi tramite messaggio privato il comando *!enableRankedStats* seguito da uno spazio e dal tuo nome evocatore in League of Legends.");
-          break;
+            t += "***NOTE:***\n";
+            t += "+) E' vietato lo spam di tali comandi, pena il disabilitamento del Bot.\n";
+            t += "+) Per il corretto funzionamento del Bot, rispettare gli spazi tra le parole e inserire i nomi in modo appropiato.";
+            message.channel.send(t);
+            break;
+          case "!pizza":
+            message.channel.send("Sono un imperatore io, non un porta pizze!", {tts: true});
+            break;
+          case "!insulta1":
+            message.channel.send(par + ", sei un pirla.", {tts: true});
+            break;
+          case "!insulta2":
+            message.channel.send(par + ", tua madre è una bagascia.", {tts: true});
+            break;
+          case "!insulta3":
+            message.channel.send(par + ", sei più inutile di Antonio.", {tts: true});
+            break;
+          case "!enableRankedStats":
+            if(message.channel.type == "dm") {
+              request({url: "https://euw1.api.riotgames.com/lol/summoner/v3/summoners/by-name/" + par + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
+                if (!error && response.statusCode === 200) {
+                  ranked.insert({discord:message.author.username,summonerID:body.id,summonerName:par});
+                  saveRankedUsers();
+                  message.channel.send("Le **Statistiche Ranked** sono state abilitate.\nD'ora in avanti riceverai, tramite messaggio privato, le statistiche dei giocatori ogni qual volta cominci una classificata.\nRicordati di tenere Discord aperto!\n\nPuoi disabilitare la funzione in qualunque momento inviando tramite messaggio privato il comando *!disableRankedStats*");
+                }
+                else
+                {
+                  message.channel.send("Inserisci un nome evocatore valido.");
+                }
+              })
+            }
+            break;
+          case "!disableRankedStats": 
+            ranked({discord:message.author.username}).remove();
+            message.channel.send("Le **Statistiche Ranked** sono state disabilitate.\nPer poterle riattivare, scrivi tramite messaggio privato il comando *!enableRankedStats* seguito da uno spazio e dal tuo nome evocatore in League of Legends.");
+            break;
+        }
       }
     }  
   }
