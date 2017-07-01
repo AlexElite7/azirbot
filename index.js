@@ -66,25 +66,16 @@ function getMember(p) {
 }
 
 function getMemberType(m) {
-  if(m.roles.exists("name", "Ospiti")) {
-    return 0;
+  var h = m.highestRole.name;
+  var n;
+  switch(h) {
+    case "Ospiti": n = 0; break;
+    case "Membri": n = 1; break;
+    case "Tecnico": n = 2; break;
+    case "Admin": n = 3; break;
+    case "Founder": n = 4; break;
   }
-  else if (m.roles.exists("name", "Membri"))
-  {
-    return 1;
-  }
-  else if (m.roles.exists("name", "Tecnico"))
-  {
-    return 3;
-  }
-  else if (m.roles.exists("name", "Admin"))
-  {
-    return 4;
-  }
-  else if (m.roles.exists("name", "Founder"))
-  {
-    return 5;
-  }
+  return n;
 }
 
 //Funzione di avvio inserimento membro
@@ -108,20 +99,21 @@ function printDetails(member, actionID) {
   var e = db({discordID:member.id}).first();
   var t = "";
   if(actionID == 0) {
-    t += "Il membro <@" + member.id + "> è stato rimosso.\n"
+    t += "L'utente <@" + member.id + "> è stato rimosso.\n"
     t += "**Telegram:** " + e.telegram + "\t\t**Note:** " + e.notes;
   }
   else 
   {
-    t += "Il membro <@" + member.id + "> è stato aggiunto.\n"
+    t += "L'utente <@" + member.id + "> è stato aggiunto.\n"
   }
   channelBotG.send(t);
 }
 
 //Stampa le statistiche relative ad un giocatore
 function printSummonerRankedData(summoner, champion, channel) {
-  gg.Summary("euw", summoner, function(error, data1) {
-    gg.Champions("euw", summoner, 7, function(error, data2) {
+  gg.Summary("euw", summoner, function(error1, data1) {
+    gg.Champions("euw", summoner, 7)
+    .then((data2) => {
       var p = false;
       var i = 0;
       while(!p) {
@@ -137,20 +129,20 @@ function printSummonerRankedData(summoner, champion, channel) {
         else
         {
           i++;
+
         }
       }
-      if(!p) {
-        channel.send(
-            "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
-            "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
-            "**Winratio:** 0%\t\t" +
-            "**Giocate:** 0\t\t" +
-            "**KDA:** 0.00\n"); 
-      }
 	  })
+    .then((error2) => {
+      channel.send(
+        "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
+        "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
+        "**Winratio:** 0%\t\t" +
+        "**Giocate:** 0\t\t" +
+        "**KDA:** 0.00\n"); 
+    })
   })
 }
-
 //Stampa l'elenco di giocatori in base al team
 function printTeamRankedData (summonerID, teamID, channel) {
   channel.send("```Markdown\n#Team " + (teamID + 1) + "```\n");
@@ -209,7 +201,7 @@ client.on("guildMemberRemove", (member) => {
 
 //Rileva se un utente con Statistiche Ranked abilitate entra in gioco
 client.on("guildMemberUpdate", (oldMember, newMember) => {
-    if(oldMember.highestRole.name == "@everyone" && (newMember.highestRole.name == "Ospiti" || newMember.highestRole.name == "Membri")) {
+    if(oldMember.highestRole.name == "@everyone" && newMember.highestRole.name != "@everyone") {
       db.insert({discordID:newMember.id,type:getMemberType(newMember),discord:newMember.user.username,telegram:"",notes:""});
       db.sort("type desc");
       saveMembers();
@@ -280,6 +272,7 @@ client.on("message", message => {
           t += "+) **!setNotes @nomeutente**: imposta le note di un utente nell'elenco.\n";
           t += "+) **!showDiscord**: mostra l'elenco degli utenti relativo al Discord.\n";
           t += "+) **!showTelegram**: mostra l'elenco degli utenti relativo a Telegram.\n";
+          t += "+) **!enableForUsers**: abilita/disabilita i comandi del Bot per gli utenti.\n";
 
           t += "***NOTE:***\n";
           t += "+) Per il corretto funzionamento del Bot, rispettare gli spazi tra le parole e inserire i nomi in modo appropiato.";
