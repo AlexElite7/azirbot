@@ -1,13 +1,23 @@
+//Libreria Date
+var moment = require("moment");
+moment().format();
 //Proprietà server
 const Discord = require("discord.js");
 const client = new Discord.Client();
 var guildG = new Discord.Guild();
 var channelBotG = new Discord.Channel();
 var channelUsersG = new Discord.Channel();
+var channelAdminG = new Discord.Channel();
+var channelSalottoG = new Discord.Channel();
+var channelNormal1G = new Discord.Channel();
+var channelNormal2G = new Discord.Channel();
+var channelNormal3G = new Discord.Channel();
+var channelNormal4G = new Discord.Channel();
+var channelNormal5G = new Discord.Channel();
+var movePlayers = false;
 //Database
 TAFFY = require("taffy");
 var db = TAFFY([]);   //Utenti
-var ranked = TAFFY([]);;  //Utenti con Statistiche Ranked abilitate
 var gg = new (require("op.gg-api/client.js"));
 const fs = require("fs");
 var request = require("request");
@@ -15,30 +25,11 @@ var request = require("request");
 var functionBotID = 0;
 var nMember;
 //Informazioni generali
-var version = "0.3 (Beta)";
+var version = "0.4 (Beta)";
 var botEnabledForUsers = true;
 
-//Salva gli utenti abilitati alle Statistiche Ranked in un file
-function saveRankedUsers() {
-  fs.writeFile("./data/ranked.json", ranked().stringify(), (err) => {
-    if (err) {
-      console.error(err);
-    } 
-  });
-}
-
-//Carica il database dal file
-function loadRankedUsers() {
-  var rankedFile = JSON.parse(fs.readFileSync("./data/ranked.json", "utf8"));
-  for (var key in rankedFile) {
-    if (rankedFile.hasOwnProperty(key)) {
-      ranked.insert({discord:rankedFile[key].discord,summonerID:rankedFile[key].summonerID,summonerName:rankedFile[key].summonerName});
-    }
-  }
-}
-
 //Salva il database in un file
-function saveMembers() {
+function saveUsers() {
   fs.writeFile("./data/elenco.json", db().stringify(), (err) => {
     if (err) {
       console.error(err);
@@ -47,11 +38,11 @@ function saveMembers() {
 }
 
 //Carica il database dal file
-function loadMembers() {
+function loadUsers() {
   var dbFile = JSON.parse(fs.readFileSync("./data/elenco.json", "utf8"));
   for (var key in dbFile) {
     if (dbFile.hasOwnProperty(key)) {
-      db.insert({discordID:dbFile[key].discordID,type:dbFile[key].type,discord:dbFile[key].discord,telegram:dbFile[key].telegram,notes:dbFile[key].notes});
+      db.insert({discordID:dbFile[key].discordID,type:dbFile[key].type,username:dbFile[key].username,telegram:dbFile[key].telegram,notes:dbFile[key].notes,ultimoAccesso:dbFile[key].ultimoAccesso});
     }
   }
 }
@@ -65,33 +56,31 @@ function getMember(p) {
   return guildG.members.get(m);
 }
 
+//Restituisce tipo di membro
 function getMemberType(m) {
   var h = m.highestRole.name;
   var n;
   switch(h) {
     case "Ospiti": n = 0; break;
     case "Membri": n = 1; break;
-    case "Tecnico": n = 2; break;
+    case "Moderatori": n = 2; break;
     case "Admin": n = 3; break;
     case "Founder": n = 4; break;
+    //Eccezioni
+    case "Poeta <3": n = 3; break;
+    case "L'inutile perenne": n = 1; break;
   }
   return n;
 }
 
-//Funzione di avvio inserimento membro
-function requestDetails(member) {
-  var t = "";
-  if(member.user.username == "UtenteTelegram") {
-    t += "Inserisci il nome dell'utente Telegram ed eventuali note personalizzate.\n";
-  }
-  else
-  {
-    t += "Inserisci l'eventuale nome su Telegram e/o delle note personalizzate di <@" + member.id + ">\n";
-  }
-  t += "Separa le due informazioni con un trattino.\nSe si vuole lasciare vuoti i campi, scrivere soltanto il trattino.";
-  channelBotG.send(t);
-  functionBotID = 1;
-  nMember = member;
+//Ottiene data del giorno corrente
+function getCurrentDate() {
+  var data = new Date();
+  var giorno = data.getDate();
+  var mese = data.getMonth() + 1;
+  var anno = data.getFullYear();
+  var t = giorno + "/" + mese + "/" + anno;
+  return t;
 }
 
 //Stampa i dati del membro qualora viene aggiunto/eliminatio
@@ -100,7 +89,12 @@ function printDetails(member, actionID) {
   var t = "";
   if(actionID == 0) {
     t += "L'utente <@" + member.id + "> è stato rimosso.\n"
-    t += "**Telegram:** " + e.telegram + "\t\t**Note:** " + e.notes;
+    if(e.telegram != "") {
+      t += "**Telegram:** " + e.telegram + "\n";
+    }
+    if(e.notes != "") {
+      t += "**Note:** " + e.notes + "\n";
+    }
   }
   else 
   {
@@ -109,114 +103,132 @@ function printDetails(member, actionID) {
   channelBotG.send(t);
 }
 
-//Stampa le statistiche relative ad un giocatore
-function printSummonerRankedData(summoner, champion, channel) {
-  gg.Summary("euw", summoner, function(error1, data1) {
-    gg.Champions("euw", summoner, 7)
-    .then((data2) => {
-      var p = false;
-      var i = 0;
-      while(!p) {
-        if(data2[i].name == champion) {
-          channel.send(
-            "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
-            "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
-            "**Winratio:** " + data2[i].winRatio + "%\t\t" +
-            "**Giocate:** " + (data2[i].wins + data2[i].losses) + " (" + data2[i].wins + "W | " + data2[i].losses + "L)\t\t" +
-            "**KDA:** " + data2[i].ratio + "\n");  
-          p = true;
-        }
-        else
-        {
-          i++;
-
-        }
-      }
-	  })
-    .then((error2) => {
-      channel.send(
-        "```Markdown\n" + champion + " | " + summoner + "```" +   //Stampa campione e relativo giocatore
-        "**Lega:** " + data1.league + "\n" +                      //Stampa lega giocatore
-        "**Winratio:** 0%\t\t" +
-        "**Giocate:** 0\t\t" +
-        "**KDA:** 0.00\n"); 
-    })
-  })
-}
-//Stampa l'elenco di giocatori in base al team
-function printTeamRankedData (summonerID, teamID, channel) {
-  channel.send("```Markdown\n#Team " + (teamID + 1) + "```\n");
-  request({url: "https://euw1.api.riotgames.com/lol/spectator/v3/active-games/by-summoner/" + summonerID + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
-    if (!error && response.statusCode === 200) {
-      for(var i = teamID * 5; i < (teamID * 5) + 5; i++) {
-        let summoner = body.participants[i].summonerName;
-        request({url: "https://euw1.api.riotgames.com/lol/static-data/v3/champions/" + body.participants[i].championId + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error2, response2, body2) {
-          if (!error && response.statusCode === 200) {
-            let champion = body2.name;
-            printSummonerRankedData(summoner, champion, channel);
-          }
-        })
-      }
-    }
-  })
-}
-
 //Avvio bot
 client.on("ready", () => {
   console.log("Bot avviato.");
   guildG = client.guilds.find("name", "Italian Drifters");
   channelBotG = guildG.channels.find("name", "azir_bot");
   channelUsersG = guildG.channels.find("name", "hall");
-  loadMembers();
-  loadRankedUsers();
+  channelAdminG = guildG.channels.find("name", "admin");
+  channelSalottoG = guildG.channels.find("name", "Salotto");
+  channelNormal1G = guildG.channels.find("name", "Normal #1");
+  channelNormal2G = guildG.channels.find("name", "Normal #2");
+  channelNormal3G = guildG.channels.find("name", "Normal #3");
+  channelNormal4G = guildG.channels.find("name", "Normal #4");
+  channelNormal5G = guildG.channels.find("name", "Normal #4");
+  loadUsers();
 });
 
-//Stampa i dati di un utente quando viene cacciato dal server
-client.on("presenceUpdate", (oldMember, newMember) => {
-    if(newMember.presence.game != null) {
-      if(newMember.presence.game.name == "League of Legends" && ranked({discord:newMember.user.username}).count() == 1)
-      {
-        var summonerID = ranked({discord:newMember.user.username}).first().summonerID;
-        request({url: "https://euw1.api.riotgames.com/lol/spectator/v3/active-games/by-summoner/" + summonerID + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
-          if (!error && response.statusCode === 200) {
-            if(body.gameQueueConfigId == 420 || body.gameQueueConfigId == 440) {
-              newMember.user.createDM();
-              var channel = newMember.user.dmChannel;
-              channel.send("Lo scriba di Azir sta elaborando le informazioni, attendi...");
-              printTeamRankedData(summonerID, 0, channel);
-              setTimeout(printTeamRankedData, 10000, summonerID, 1, channel);
-            }
-          }
-        })
-      }
-    }
-});
-
-//Rileva se un utente con Statistiche Ranked abilitate entra in gioco
+//Se l'utente viene rimosso da Discord viene eliminato anche dalla lista
 client.on("guildMemberRemove", (member) => {
-    printDetails(member, 0);
-    db({discordID:member.id}).remove();
-    saveMembers();
+  printDetails(member, 0);
+  db({discordID:member.id}).remove();
 });
 
 //Aggiunge l'utente in automatico alla lista ospiti
 client.on("guildMemberAdd", (member) => {
-  let ospiti = guildG.roles.find("name", "Ospiti");
+  var ospiti = guildG.roles.find("name", "Ospiti");
   member.addRole(ospiti);
+  db.insert({discordID:member.id,type:0,username:member.user.username,telegram:"",notes:"",ultimoAccesso:getCurrentDate()});
+  //db.sort("type desc");
+  printDetails(member, 1);
 });
 
-//Rileva se un utente con Statistiche Ranked abilitate entra in gioco
+//Aggiorna la data di ultimo accesso di ogni utente
+client.on("voiceStateUpdate", (oldMember, newMember) => {
+  if(newMember.voiceChannelID == null) {
+    db({discordID:newMember.id}).update({ultimoAccesso:getCurrentDate()});
+  }
+});
+
+
+client.on("presenceUpdate", (oldMember, newMember) => {
+  //Comandi automatici del server, eseguiti all'accesso di un admin specifico
+  if(newMember.user.username == "Drekkar" && newMember.presence.status == "online") {
+    //Controlla gli accessi degli Ospiti e caccia quelli che non si attivano da più di due settimane
+    var b = moment(getCurrentDate(), "DD-MM-YYYY");
+    db({type:0}).each(function(r) {
+      var a = moment(r.ultimoAccesso, "DD-MM-YYYY")
+      var c = b.diff(a, "days");
+      if(c > 14) {
+        var m = guildG.members.get(r.discordID);
+        m.kick("Ospite inattivo per più di 14 giorni.");
+      }
+    });
+    saveUsers();
+  }
+
+  //Sposta dal Salotto tutte le persone che sono in gioco e le sposta in un canale apposito
+  if(newMember.presence.game != null && newMember.voiceChannel != null) {
+    if(newMember.presence.game.name == "League of Legends" && newMember.voiceChannel.name == "Salotto" && !movePlayers) {
+      movePlayers = true;
+      var c = new Discord.Channel();
+      if(Array.from(channelNormal1G.members).length == 0) {
+        c = channelNormal1G;
+      }
+      else if(Array.from(channelNormal2G.members).length == 0) {
+        c = channelNormal2G;
+      }
+      else if(Array.from(channelNormal3G.members).length == 0) {
+        c = channelNormal3G;
+      } 
+      else if(Array.from(channelNormal4G.members).length == 0) {
+        c = channelNormal4G;
+      }
+      else if(Array.from(channelNormal4G.members).length == 0) {
+        c = channelNormal5G;
+      }
+
+      setTimeout(function() {
+        channelSalottoG.members.forEach(function(par, key) {
+          var m = guildG.members.get(key);
+          if(m.presence.game.name == "League of Legends") {
+            m.setVoiceChannel(c);
+          }
+        });
+        movePlayers = false;
+      }, 5000);
+    }
+  }
+});
+
 client.on("guildMemberUpdate", (oldMember, newMember) => {
-    if(oldMember.highestRole.name == "@everyone" && newMember.highestRole.name != "@everyone") {
-      db.insert({discordID:newMember.id,type:getMemberType(newMember),discord:newMember.user.username,telegram:"",notes:""});
-      db.sort("type desc");
-      saveMembers();
-      printDetails(newMember, 1);
+  if(oldMember.highestRole != newMember.highestRole) 
+  {
+    //Aggiorna il tipo di membro
+    db({discordID:newMember.id}).update({type:getMemberType(newMember)});
+
+    if(newMember.highestRole.name != "Ospiti" && newMember.highestRole.name != "@everyone") {
+      var t = "";
+      switch(newMember.highestRole.name) {
+        //Invia un messaggio di benvenuto ai nuovi Membri
+        case "Membri":
+          t += "**Benvenuto negli Italian Drifters, <@" + newMember.id + ">!**\n\n";
+
+          t += "Siamo felici che tu ti sia unito alla nostra community e ci auguriamo che la tua esperienza sarà piacevole qui con noi.\n";
+          t += "Per facilitarti nell'integrazione al nostro gruppo ecco un paio di punti che ti invitiamo a leggere.\n\n";
+
+          t += "**IL REGOLAMENTO**\n";
+          t += "Nella chat testuale #regolamento troverai una serie di messaggi che spiegano il funzionamento del server e riportano le regole da seguire per garantire una buona convivenza nel gruppo. Leggile con attenzione e rivolgiti ad un Admin o Moderatore se hai bisogno di maggiori chiarimenti.\n\n";
+
+          t += "**COME FACCIO A STRINGERE AMICIZIA?**\n";
+          t += "Se sei una persona timida, sei un nuovo arrivato e sei alle prime armi con una community del genere, non devi preoccuparti: lo Staff contatta personalmente i recenti iscritti per giocare insieme e aiutarli a stringere amicizia.\n";
+          t += "Puoi anche chiedere - nella chat testuale #hall o girando nelle varie stanze vocali - se qualcuno è disponibile a fare una partita, con un pochino di pazienza troverai nuovi compagni con cui giocare.\n";
+          t += "Capita inoltre a volte che altri ragazzi hanno dei posti liberi nella lobby e domandano - sulla #hall o sulla chat Telegram - chi abbia voglia di unirsi, quindi rimani sintonizzato.\n\n";
+
+          t += "**POSSO TROVARE UN COMPAGNO DI RANKED?**\n";
+          t += "Certo! Nel server potrai trovare giocatori di tutti gli Elo - dal Bronzo fino al Diamante - disposti a fare sia Solo/Duo sia Flex, l'importante è dimostrare di essere socievoli con gli altri e partecipare alla vita della community.\n\n"
+          
+          t += "**ORGANIZZATE EVENTI?**\n";
+          t += "Si, al momento il server si sta impegnando nell'organizzazione di tornei di vario tipo inerenti a League of Legends e non, quindi tieni d'occhio il canale #avvisi!\n\n";
+          
+          t += "Questo è tutto!\n";
+          t += "**Buona permanenza!**\n";
+          break;
+      }
+      newMember.send(t);
     }
-    else if(oldMember.highestRole != newMember.highestRole) 
-    {
-      db({discordID:newMember.id}).update({type:getMemberType(newMember)});
-    }
+  }
 });
 
 client.on("message", message => {
@@ -225,11 +237,12 @@ client.on("message", message => {
     switch(functionBotID) {
       //Inserimento dati per il membro aggiunto
       case 1:
-        var args = message.content.split("-");
-        db.insert({discordID:nMember.id,type:getMemberType(nMember),discord:nMember.user.username,telegram:args[0],notes:args[1]});
-        db.sort("type desc");
-        channelBotG.send("Utente aggiunto.");
-        saveMembers();
+        var m = message.content;
+        if(m == "null") {
+          m = "";
+        }
+        db({discordID:nMember.id}).update({username:m});
+        channelBotG.send("Username aggiornato.");
         break;
       case 2:
         var m = message.content;
@@ -238,7 +251,6 @@ client.on("message", message => {
         }
         db({discordID:nMember.id}).update({telegram:m});
         channelBotG.send("Telegram aggiornato.");
-        saveMembers();
         break;
       case 3:
         var m = message.content;
@@ -247,13 +259,6 @@ client.on("message", message => {
         }
         db({discordID:nMember.id}).update({notes:m});
         channelBotG.send("Note aggiornate.");
-        saveMembers();
-        break;
-      case 4:
-        var m = message.content;
-        db({telegram:m}).remove();
-        channelBotG.send("Utente Telegram eliminato.");
-        saveMembers();
         break;
     }
     functionBotID = 0;
@@ -264,20 +269,19 @@ client.on("message", message => {
     var args = message.content.split(" ", 1);
     var cmd = args[0];
     var par = message.content.substring(cmd.length + 1);
-    //Comandi amministratori
+    ////Comandi amministratori
     if(message.channel.name == "azir_bot") {
       switch(cmd) {
-        case "!help":
+        case "!help": //Mostra i comandi
           var t = "";
           t += "`Azir Bot - Versione " + version + "`\n\n";
 
           t += "Elenco dei comandi disponibili:\n";
-          t += "+) **!add @nomeutente**: aggiunge un utente all'elenco.\n";
-          t += "+) **!delete @nomeutente**: elimina un utente all'elenco.\n";
-          t += "+) **!setTelegram @nomeutente**: imposta il Telegram di un utente nell'elenco.\n";
-          t += "+) **!setNotes @nomeutente**: imposta le note di un utente nell'elenco.\n";
           t += "+) **!showDiscord**: mostra l'elenco degli utenti relativo al Discord.\n";
           t += "+) **!showTelegram**: mostra l'elenco degli utenti relativo a Telegram.\n";
+          t += "+) **!setUsername @tag**: imposta il nome di un utente nell'elenco (non cambierà il suo nome su Discord).\n";
+          t += "+) **!setTelegram @tag**: imposta il Telegram di un utente nell'elenco.\n";
+          t += "+) **!setNotes @tag**: imposta le note di un utente nell'elenco.\n";
           t += "+) **!enableForUsers**: abilita/disabilita i comandi del Bot per gli utenti.\n";
 
           t += "***NOTE:***\n";
@@ -287,55 +291,27 @@ client.on("message", message => {
           t = "";
 
           t += "***ISTRUZIONI:***\n";
-          t += "Quando un utente viene inserito nel ruolo *Membri* per essere abilitato al server, il Bot chiederà automaticamente\n";
-          t += "di inserire il nome Telegram dell'utente (se presente nel gruppo) ed eventuali note.\n";
-          t += "Queste due informazioni vanno scritte in un messaggio nel canale *#azir_bot* separate da un trattino.\n";
-          t += "Se non si vuole aggiungere nessuna informazione, scrivere semplicemente il trattino per lasciare vuoti i campi.\n";
-          t += "Se si vuole lasciare vuoto un campo tramite *!setTelegram* e/o *!setNotes*, scrivere *null* quando viene richiesta l'informazione.\n\n";
-
-          t += "I comandi *!add*, *!delete*, *!setTelegram* e *!setNotes* richiedono che l'utente in questione venga menzionato\n";
+          t += "I comandi *!setUsername*, *!setTelegram* e *!setNotes* richiedono che l'utente in questione venga menzionato\n";
           t += "tramite il simbolo @ affinché la funzione possa svolgere il suo compito correttamente.\n";
           t += "Poiché non è possibile menzionare direttamente i membri all'interno del canale *#azir_bot*\n";
           t += "tramite il simbolo @ (ovvero gli unici utenti menzionabili sono gli amministratori), esistono due procedere alternative:\n";
-          t += "+) Utilizzare il comando *!show*, tasto destro sul tag del membro e cliccare su *Menziona*\n";
+          t += "+) Utilizzare il comando *!show*, tasto destro sul Tag dell'utente e cliccare su *Menziona*\n";
           t += "+) Menzionare l'utente in un canale testuale pubblico per poi copiare il contenuto nel canale *#azir_bot*\n\n";
-
-          t += "Se si vuole aggiungere un membro appartenente solo a Telegram, menzionare l'utente su Discord *UtenteTelegram*.\n";
-          t += "I membri presenti soltanto sul gruppo Telegram possono essere visualizzati soltanto col comando *!showTelegram*.\n";
-          t += "Per eliminare un membro Telegram, menzionare l'utente su Discord *UtenteTelegram* e specificare successivamente il nome.";
 
           message.channel.send(t);
           break;
-        case "!add":
-          var m = getMember(par);
-          if(m != undefined) {
-            requestDetails(m);
+        case "!setUsername": //Imposta l'username di un utente
+          nMember = getMember(par);
+          if(nMember != undefined) {
+            channelBotG.send("Invia un messaggio per impostare l'Username di <@" + nMember.id + ">");
+            functionBotID = 1;
           }
           else
           {
-            channelBotG.send("Nome utente erratto.");
+            channelBotG.send("Tag erratto.");
           }
           break;
-        case "!delete":
-          var m = getMember(par);
-          if(m != undefined) {
-            if(m.user.username == "UtenteTelegram") {
-                channelBotG.send("Invia un messaggio per specificare l'utente Telegram da eliminare.");
-                functionBotID = 4;
-            }
-            else
-            {
-                printDetails(m);
-                db({discordID:m.id}).remove();
-                saveMembers();
-            }
-          }
-          else
-          {
-            channelBotG.send("Nome utente erratto.");
-          }
-          break;
-        case "!setTelegram":
+        case "!setTelegram": //Imposta il Telegram di un utente
           nMember = getMember(par);
           if(nMember != undefined) {
             channelBotG.send("Invia un messaggio per impostare il Telegram di <@" + nMember.id + ">");
@@ -343,27 +319,27 @@ client.on("message", message => {
           }
           else
           {
-            channelBotG.send("Nome utente erratto.");
+            channelBotG.send("Tag erratto.");
           }
-          break;
-        case "!setNotes":
+          break; 
+        case "!setNotes": //Imposta le note di un utente
           nMember = getMember(par);
-          if(nMember != undefined) {
+          if(nMember != undefined) {  
             channelBotG.send("Invia un messaggio per impostare le note di <@" + nMember.id + ">");
             functionBotID = 3;
           }
           else
           {
-            channelBotG.send("Nome utente erratto.");
+            channelBotG.send("Tag erratto.");
           }
           break;
-        case "!showDiscord":
+        case "!showDiscord":  //Mostra l'elenco degli utenti in base al Discord
           message.channel.send("```Elenco Utenti (Discord)```\n");
-          message.channel.send("```Legenda:\n⭐ - Founder\n✦ - Admin\n✪ - Tecnico\n★ - Membro\n☆ - Ospite```\n");
+          message.channel.send("```Legenda:\n⭐ - Founder\n✦ - Admin\n✪ - Moderatore\n★ - Membro\n☆ - Ospite```\n");
           var i = 0; var j = 0;
           var t = "```Markdown\n#Pag. 0```\n"; 
-          db().each(function(r) {
-            if(r.discord != "UtenteTelegram") {
+          db().order("type desc, username logical").each(function(r) {
+            if(r.username != "UtenteTelegram") {
               var symbol;
               switch(r.type) {
                 case 0: symbol = "☆"; break;
@@ -373,7 +349,14 @@ client.on("message", message => {
                 case 4: symbol = "⭐"; break;
               }
               symbol += "| ";
-              t += symbol + "**Discord:** <@" + r.discordID + ">\t\t**Telegram:** " + r.telegram + "\t\t**Note:** " + r.notes + "\n";
+              t += symbol + "**Username:** " + r.username
+              if(r.telegram != "") {
+                t += "\t\t**Telegram:** " + r.telegram;
+              }
+              if(r.notes != "") {
+                t += "\t\t**Note:** " + r.notes;
+              }
+              t += "\t\t**Tag:** <@" + r.discordID + ">\t\t**Ultimo accesso:** " + r.ultimoAccesso + "\n";
               i++;
               if(i == 10) {
                 message.channel.send(t);
@@ -384,21 +367,21 @@ client.on("message", message => {
           });
           message.channel.send(t + "\n```Fine elenco.```");
           break;
-        case "!showTelegram":
+        case "!showTelegram": //Mostra l'elenco degli utenti in base al Telegram
           message.channel.send("```Elenco Utenti (Telegram)```\n\n");
           var i = 0; var j = 0;
           var t = "```Markdown\n#Pag. 0```\n"; 
           db().each(function(r) {
             if(r.telegram != "") {
-              var showDiscord;
-              if(r.discord == "UtenteTelegram") {
-                showDiscord = "<nessuno>";
-              }
-              else
+              t += "**Telegram:** " + r.telegram;
+              if(r.notes != "")
               {
-                showDiscord = "<@" + r.discordID + ">";
+                t += "\t\t**Note:** " + r.notes;
               }
-              t += "**Telegram:** " + r.telegram + "\t\t**Discord:** " + showDiscord + "\t\t**Note:** " + r.notes + "\n"
+              if(r.username != "UtenteTelegram") {
+                t += "\t\t**Discord:** <@" + r.discordID + ">";
+              }
+              t += "\n";
               i++;
               if(i == 10) {
                 message.channel.send(t);
@@ -409,7 +392,7 @@ client.on("message", message => {
           });
           message.channel.send(t + "\n```Fine elenco.```");
           break;
-        case "!enableForUsers":
+        case "!enableForUsers": //Abilita/disabilita i comandi del Bot per gli utenti
           if(botEnabledForUsers) {
             botEnabledForUsers = false;
             channelBotG.send("Comandi del bot disabilitati per gli utenti.");
@@ -422,111 +405,79 @@ client.on("message", message => {
             channelUsersG.send("I comandi del bot sono stati abilitati.\nEvitate lo spam, grazie.");
           }
           break;
-        //Comandi nascosti
-        case "!loadUsers":
-          loadMembers();
+        ////Comandi nascosti
+        case "!loadUsers": 
+          loadUsers();
           message.channel.send("Utenti caricati.");
           break; 
         case "!saveUsers":
-          saveMembers();
+          saveUsers();
           message.channel.send("Utenti salvati.");
           break; 
         case "!upUsers":
-          var c;
-          c = guildG.roles.find("name", "Founder").members;
-          c.forEach(function(par, key) {
+          db().remove();
+          var d = getCurrentDate();
+          guildG.members.forEach(function(par, key) {
             var m = guildG.members.get(key);
-            db.insert({discordID:m.id,type:4,discord:m.user.username,telegram:"",notes:""});
+            db.insert({discordID:m.id,type:getMemberType(m),username:m.user.username,telegram:"",notes:"",ultimoAccesso:d});
           });
-          c = guildG.roles.find("name", "Admin").members;
-          c.forEach(function(par, key) {
-            var m = guildG.members.get(key);
-            db.insert({discordID:m.id,type:3,discord:m.user.username,telegram:"",notes:""});
-          });
-          c = guildG.roles.find("name", "Tecnico").members;
-          c.forEach(function(par, key) {
-            var m = guildG.members.get(key);
-            db.insert({discordID:m.id,type:2,discord:m.user.username,telegram:"",notes:""});
-          });
-          c = guildG.roles.find("name", "Membri").members;
-          c.forEach(function(par, key) {
-            var m = guildG.members.get(key);
-            db.insert({discordID:m.id,type:1,discord:m.user.username,telegram:"",notes:""});
-          });
-          c = guildG.roles.find("name", "Ospiti").members;
-          c.forEach(function(par, key) {
-            var m = guildG.members.get(key);
-            db.insert({discordID:m.id,type:0,discord:m.user.username,telegram:"",notes:""});
-          });
-          db.sort("type desc");
           message.channel.send("Utenti caricati.");
           break;
       }
     }
-    //Comandi utenti
+    ////Comandi utenti
     else {
-      if(botEnabledForUsers) {
+      if(botEnabledForUsers && message.member.highestRole.name != "Ospiti") {
         switch(cmd) {
-          case "!help":
+          case "!help": //Mostra i comando
             var t = "";
             t += "`Azir Bot - Versione " + version + "`\n\n";
 
             t += "Elenco delle funzionalità disponibili:\n\n";
 
-            t += "**STATISTICHE RANKED**\n";
-            t += "Questo Bot è in grado di fornirvi, in maniera del tutto automatica, le informazioni relative\n";
-            t += "ai giocatori della partita classificata che state giocando, senza consultare siti come OP.GG!\n";
-            t += "Per attivare questa funzione sarà sufficiente scrivere, tramite messaggio privato al Bot, il seguente comando:\n";
-            t += "**!enableRankedStats il_vostro_nome_su_lol**\n";
-            t += "Vi comparirà un messaggio che le **Statistiche Ranked** sono state abilitate, e che comincerete\n";
-            t += "a ricevere informazioni ogni qual volta entrerete in una partita classificata.\n"
-            t += "Qualora voleste disattivare questa funzione, basta inviare, sempre tramite messaggio privato, il seguente comando:\n";
-            t += "**!disableRankedStats**\n\n";
-
             t += "**COMANDI IN CHAT**\n";
             t += "Scrivere uno di questi comandi nella chat testuale #hall:\n";
             t += "+) **!help**: mostra l'elenco dei comandi.\n";
+            t += "+) **!sos**: invia una richiesta d'aiuto allo Staff.\n";
             t += "+) **!pizza**: joke del Bot.\n";
-            t += "+) **!insulta1 @nomeutente**: insulta utente con una frase preimpostata (n° 1).\n";
-            t += "+) **!insulta2 @nomeutente**: insulta utente con una frase preimpostata (n° 2).\n";
-            t += "+) **!insulta3 @nomeutente**: insulta utente con una frase preimpostata (n° 3).\n\n";
+            t += "+) **!insulta @tag**: insulta utente con una frase scelta casualmente tra cinque preimpostate.\n";
+            t += "+) **!dice**: lancia un dado a sei faccie.\n";
 
             t += "***NOTE:***\n";
             t += "+) E' vietato lo spam di tali comandi, pena il disabilitamento del Bot.\n";
             t += "+) Per il corretto funzionamento del Bot, rispettare gli spazi tra le parole e inserire i nomi in modo appropiato.";
             message.channel.send(t);
             break;
-          case "!pizza":
+          case "!sos": //Manda un messaggio di aiuto
+            var t = "Messaggio per lo Staff.\nIl membro <@" + message.author.id + "> ha bisogno di aiuto.";
+            channelUsersG.send(t, {tts: true});
+            channelAdminG.send(t, {tts: true});
+            break;
+          case "!pizza": //Joke del Bot
             message.channel.send("Sono un imperatore io, non un porta pizze!", {tts: true});
             break;
-          case "!insulta1":
-            message.channel.send(par + ", sei un pirla.", {tts: true});
-            break;
-          case "!insulta2":
-            message.channel.send(par + ", tua madre è una bagascia.", {tts: true});
-            break;
-          case "!insulta3":
-            message.channel.send(par + ", sei più inutile di Antonio.", {tts: true});
-            break;
-          case "!enableRankedStats":
-            if(message.channel.type == "dm") {
-              request({url: "https://euw1.api.riotgames.com/lol/summoner/v3/summoners/by-name/" + par + "?api_key=RGAPI-c730cb01-e523-40ca-a45d-8356c8238c95", json: true}, function (error, response, body) {
-                console.log(response.statusCode);
-                if (!error && response.statusCode === 200) {
-                  ranked.insert({discord:message.author.username,summonerID:body.id,summonerName:par});
-                  saveRankedUsers();
-                  message.channel.send("Le **Statistiche Ranked** sono state abilitate.\nD'ora in avanti riceverai, tramite messaggio privato, le statistiche dei giocatori ogni qual volta cominci una classificata.\nRicordati di tenere Discord aperto!\n\nPuoi disabilitare la funzione in qualunque momento inviando tramite messaggio privato il comando *!disableRankedStats*");
-                }
-                else
-                {
-                  message.channel.send("Inserisci un nome evocatore valido.");
-                }
-              })
+          case "!insulta": //Insulta una persona
+            if(par.startsWith("<@")) {
+              var r = Math.floor((Math.random() * 5) + 1);
+              var t = "";
+              par = par.split(" ", 1);
+              switch(r) {
+                case 1: t = par + ", sei un pirla."; break;
+                case 2: t = par + ", tua madre è una bagascia."; break;
+                case 3: t = par + ", sei più inutile di MeLoSushi."; break;
+                case 4: t = par + ", brutta scimmia boostata che non sei altro, vedi di sparire dalla circolazione."; break;
+                case 5: t = par + ", fai più pippe te o IL FAPPONE?"; break;
+              }
+              message.channel.send(t, {tts: true});
+            }
+            else
+            {
+              message.channel.send("Comando non valido.");
             }
             break;
-          case "!disableRankedStats": 
-            ranked({discord:message.author.username}).remove();
-            message.channel.send("Le **Statistiche Ranked** sono state disabilitate.\nPer poterle riattivare, scrivi tramite messaggio privato il comando *!enableRankedStats* seguito da uno spazio e dal tuo nome evocatore in League of Legends.");
+          case "!dice": //Lancia un dando a sei faccie
+            var r = Math.floor((Math.random() * 6) + 1);
+            message.channel.send("Dado: " + r);
             break;
         }
       }
