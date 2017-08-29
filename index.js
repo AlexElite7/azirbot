@@ -182,8 +182,10 @@ client.on("presenceUpdate", (oldMember, newMember) => {
       setTimeout(function() {
         channelSalottoG.members.forEach(function(par, key) {
           var m = guildG.members.get(key);
-          if(m.presence.game.name == "League of Legends") {
-            m.setVoiceChannel(c);
+          if(m.presence.game != null) {
+            if(m.presence.game.name == "League of Legends") {
+              m.setVoiceChannel(c);
+            }
           }
         });
         movePlayers = false;
@@ -371,7 +373,7 @@ client.on("message", message => {
           message.channel.send("```Elenco Utenti (Telegram)```\n\n");
           var i = 0; var j = 0;
           var t = "```Markdown\n#Pag. 0```\n"; 
-          db().each(function(r) {
+          db().order("telegram logical").each(function(r) {
             if(r.telegram != "") {
               t += "**Telegram:** " + r.telegram;
               if(r.notes != "")
