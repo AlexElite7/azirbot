@@ -107,6 +107,7 @@ function printDetails(member, actionID) {
 client.on("ready", () => {
   console.log("Bot avviato.");
   guildG = client.guilds.find("name", "Italian Drifters");
+  console.log(guildG.createdAt);
   channelBotG = guildG.channels.find("name", "azir_bot");
   channelUsersG = guildG.channels.find("name", "hall");
   channelAdminG = guildG.channels.find("name", "admin");
@@ -116,6 +117,19 @@ client.on("ready", () => {
   channelNormal3G = guildG.channels.find("name", "Normal #3");
   channelNormal4G = guildG.channels.find("name", "Normal #4");
   channelNormal5G = guildG.channels.find("name", "Normal #4");
+
+  var dbMembri = TAFFY([]);   //Utenti
+  guildG.members.forEach(function(par, key) {
+    var m = guildG.members.get(key);
+    if(m.highestRole.name == "Membri") {
+      dbMembri.insert({username:m.user.username})
+    }
+  });
+
+  dbMembri().order("type desc, username logical").each(function(r) {
+    console.log(r.username);
+  });
+
   loadUsers();
 });
 
@@ -397,14 +411,14 @@ client.on("message", message => {
         case "!enableForUsers": //Abilita/disabilita i comandi del Bot per gli utenti
           if(botEnabledForUsers) {
             botEnabledForUsers = false;
-            channelBotG.send("Comandi del bot disabilitati per gli utenti.");
-            channelUsersG.send("I comandi del bot sono stati disabilitati.");
+            channelBotG.send("Comandi del Bot disabilitati per gli utenti.");
+            channelUsersG.send("I comandi del Bot sono stati disabilitati.");
           }
           else
           {
             botEnabledForUsers = true;
-            channelBotG.send("Comandi del bot abilitati per gli utenti.");
-            channelUsersG.send("I comandi del bot sono stati abilitati.\nEvitate lo spam, grazie.");
+            channelBotG.send("Comandi del Bot abilitati per gli utenti.");
+            channelUsersG.send("I comandi del Bot sono stati abilitati.\nEvitate lo spam, grazie.");
           }
           break;
         ////Comandi nascosti
@@ -487,4 +501,4 @@ client.on("message", message => {
   }
 });
 
-client.login("MzA5NzE2NTA2MjQ0MDIyMjc0.C-zhHQ.Iy8SszSSySS8i__EgWn-nsLth7c");
+client.login("Mzk0ODc4Nzg1MTI5OTM4OTY0.DSKv2g.w_Z1K8CH6JhSfcZLQGQtr5HBTt4");
